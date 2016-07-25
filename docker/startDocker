@@ -1,0 +1,2 @@
+docker start e2rtw-s01
+docker start e2rtw-mqtt

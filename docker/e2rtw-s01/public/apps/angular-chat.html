@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" ng-app="rtwApp">
+<head>
+    <meta charset="utf-8" />
+    <title>完成版:AngularJs-2 way binding</title>
+    <link rel="icon" type="image/png" href="assets/imgs/ok.ico">
+    <link href="assets/css/bootstrap.css" rel="stylesheet" />       <!-- 讓網頁漂亮一點的CSS Style -->
+    <link href="assets/css/main.css" rel="stylesheet" />            <!-- 讓表單與角落離開一點 -->
+    <script src="assets/js/angular.min.js"></script>                <!-- 操控網頁元件的函式庫 -->
+
+    <script src="assets/js/jquery-3.0.0.min.js"></script>           <!-- 操控網頁元件的函式庫 -->
+    <script src="assets/js/mqttws31.min.js"></script>               <!-- 連結MQTT Broker的函式庫 -->
+    <script src="assets/js/Math.uuid.js"></script>                  <!-- 一個產生Unique ID的函式庫 -->
+
+
+</head>
+<body ng-controller="rtwAppCtrl">
+    
+    <h3>Angular Chat</h3>
+    <!-- 網頁表單UI -->
+    
+    <div ng-hide="vm.isLogin">
+    <h4>輸入您的暱稱</h4>
+    <form>
+        Nick name:<br>
+        <input type="text" name="userName" ng-model="vm.userName"><br />
+
+        Gender:<br />
+        <select ng-model="vm.gender">
+            <option value="male"> Male</option>
+            <option value="female"> Female</option>
+            <option value="other"> Other</option>
+        </select>
+        <br />
+    </form>
+
+    <br>
+    <h3>登入聊天室</h3>
+    Mqtt Host/Port: <br />
+    <input type="text" id="mqtt_host" ng-model="vm.mqtt_host" /> <input type="text" id="mqtt_port" ng-model="vm.mqtt_port"/> <br /><br />
+    <input type="button" value= "Log in Chat Room" id="connect" value="Connect" ng-click="action.login_chatroom()"/>
+    </div>
+
+    <div ng-show="vm.isLogin">
+
+    Hello {{vm.userName}}! Welcome to chat room.
+    
+    <br>請輸入您想參加的Topic: <br />
+    <input type="text" name="topic" ng-model="vm.topic" required ng-disabled="vm.isSubscribe"/>
+    <input type="button" value="{{vm.isSubscribe ? 'Un-Subscribe': 'Subscribe'}}" ng-model="vm.subscribe_button" ng-click="action.subscribe_topic()" /> <br/><br/>
+    <br>
+    Message: <br />
+    <input type="text" id="message" ng-model="vm.message"/> 
+    <input type="button" id="sendmessage" value="Send" ng-click="action.send_message()" /> <br/><br/>
+    </div>
+
+
+
+    <br/>
+    <h4>Welcome to {{vm.topic}} channel! </h4>
+    <div type="text" ng-model="vm.chat_content"> Chat room: </div>
+    <div> ========== </div>
+    <table class="table-bordered">
+        <tr ng-repeat="line in vm.chat_lines">
+            <p ng-style="vm.userColor"><td>{{line.content}}</td></p>
+        </tr>
+    </table>
+    <div> ========== </div>
+    
+    <!-- 程式邏輯 -->
+    <script>
+        // Define the module
+        var rtwApp = angular.module('rtwApp', []);
+        rtwApp.controller('rtwAppCtrl', function ($scope) {
+
+            // 設定UI會觸發的動作
+            $scope.action = {};
+
+            $scope.vm = {};
+
+            // Initial value
+            $scope.vm.userName = "Atlas";
+            $scope.vm.mqtt_host = "localhost";
+            $scope.vm.mqtt_port = "9001";
+            $scope.vm.gender = "male";
+
+            $scope.vm.topic = "Tech";
+
+
+            $scope.vm.isLogin = false;
+            $scope.vm.isHideTopic = true;
+            $scope.vm.chat_content = "Chat start:";
+
+            $scope.vm.chat_lines = [];
+
+
+            // Script Global var
+            var topic_subscribed = false;
+            var mqtt_client;
+            var topic;
+
+            $scope.userColor = {};
+            $scope.turnGreen = function() {
+                //what to do here?
+                $scope.userColor.style = {"color":"green"};
+            }
+
+            $scope.turnBlue = function() {
+                $scope.userColor.style = {"color":"blue"};
+            }
+
+
+            $scope.action.login_chatroom = function () {
+                console.log("login_chatroom trigger");
+
+                $scope.vm.topic = "Tech";
+
+
+                $scope.vm.isLogin = !$scope.vm.isLogin;
+                $scope.vm.isHideTopic = !$scope.vm.isHideTopic;
+
+                
+                var mqtt_broker_host;
+                var mqtt_broker_port;
+
+                mqtt_broker_host = $scope.vm.mqtt_host;
+                mqtt_broker_port = $scope.vm.mqtt_port;
+
+                console.log("port" + mqtt_broker_port + "host" + mqtt_broker_host);
+                mqtt_client = new Paho.MQTT.Client(mqtt_broker_host, Number(mqtt_broker_port), Math.uuid(8, 16));   // port, unique id
+
+                // 設定某些事件的回呼處理的functions
+                mqtt_client.connect({ onSuccess: onConnect });
+                mqtt_client.onConnectionLost = onConnectionLost;
+                mqtt_client.onMessageArrived = onMessageArrived;
+
+                // 當成功建立mqtt broker的連結時會被呼叫的function
+                function onConnect() {
+                    console.log("onConnect");
+                    
+
+                }
+
+                // 當與mqtt broker的連結被斷開時會被呼叫的function
+                function onConnectionLost(responseObject) {
+                    console.log("onConnectionLost");
+                    if (responseObject.errorCode !== 0) {
+                        console.log("onConnectionLost:" + responseObject.errorMessage);
+                    }
+
+                    sendMessage(($scope.vm.userName) + ' is logged out chat room');
+
+                    // UI元件的控制
+                }
+
+                // 當訂閱的主題有訊息時會被呼叫的callback function
+                function onMessageArrived(message) {
+                    console.log("onMessageArrived");
+                    // 把訊息的主要資訊擷取出來
+                    var topic = message.destinationName;
+                    // 建構一個訊息資訊物件
+                    var msgObj = {
+                        'topic': message.destinationName,
+                        'retained': message.retained,
+                        'qos': message.qos,
+                        'payload': message.payloadString
+                    };
+
+                    // 打印到Browser的debug console
+                    console.log("(Test)onMessageArrived: (message)" + message.payloadString);
+                    // 使用html的alert視窗來秀出訊息
+                    //alert(JSON.stringify(msgObj));
+
+                    $scope.$apply( function() {
+                        $scope.vm.chat_lines.push({
+                            content: message.payloadString
+                        });
+                    });
+                    console.log("onMessageArrived chat_lines" + $scope.vm.chat_lines);
+
+                }
+            };
+
+            $scope.action.subscribe_topic = function() {
+                console.log("subscribe_topic");
+                topic = $scope.vm.topic;
+                if (topic_subscribed == true) {
+                    console.log("topic_subscribed: " + topic_subscribed);
+                    // 要解除訂閱
+                    mqtt_client.unsubscribe(topic);
+                    $scope.vm.isSubscribe = false
+                    topic_subscribed = false; // 更新flag
+
+                    sendMessage(($scope.vm.userName) + ' is logged out chat room');
+                } else {
+                    console.log("topic_subscribed: " + topic_subscribed);
+                    // 要訂閱訊息主題
+                    mqtt_client.subscribe(topic);
+                    $scope.vm.isSubscribe = true;
+                    topic_subscribed = true; // 更新flag
+
+                    sendMessage(($scope.vm.userName) + ' is logged in chat room');
+                } 
+            }
+
+            $scope.action.send_message = function() {
+                console.log("send_message");
+ 
+                var formalMessage = ($scope.vm.userName) + ': ' + $scope.vm.message;
+                sendMessage(formalMessage)
+            }
+
+            sendMessage = function (message) {
+                var mqtt_message = new Paho.MQTT.Message(message);
+                mqtt_message.destinationName = $scope.vm.topic;
+                mqtt_client.send(mqtt_message);                
+            }
+
+        });
+
+    </script>
+</body>
+</html>
