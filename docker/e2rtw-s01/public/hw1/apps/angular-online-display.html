@@ -131,6 +131,9 @@
             $scope.vm.inbound_messages = [];
             $scope.vm.online_users = [];
 
+            // HW2: add visitors to record visitor on-line
+            $scope.vm.visitors = 0;
+
             // 初始圖表的資料與變數
             $scope.vm.chart_data_type = "move";
             $scope.vm.chart_data_move = 0;
@@ -147,7 +150,7 @@
                     return;
                 }
                 // 更新圖表的抬頭
-                $scope.chartConfig.title.text = "活動力: " + $scope.vm.user_id;
+                $scope.chartConfig.title.text = "來訪人數: " + $scope.vm.visitors;
 
                 // 產生mqtt連結client物件的instance
                 mqtt_client = new Paho.MQTT.Client($scope.vm.mqtt_host, Number($scope.vm.mqtt_port), Math.uuid(8, 16));
@@ -226,8 +229,10 @@
                         var user_id = found[1]; //get the "userid" from regular expression matching 
                         var idx = $scope.vm.online_users.indexOf(user_id); // 檢查在UI的array中是否存在相同的使用者
                         if (msgObj.payload == "online") {
-                            if (idx == -1)
+                            if (idx == -1) {
                                 $scope.vm.online_users.push(user_id);
+                                $scope.vm.visitors = $scope.vm.visitors + 1;
+                            }
                         }
                         else {
                             if (idx != -1)
@@ -266,6 +271,9 @@
                 $scope.vm.subscribed_topics = [];
                 $scope.vm.inbound_messages = [];
                 $scope.vm.online_users = [];
+                $scope.vm.visitors = 0;
+
+
             };
             // **動作: 送出訊息
             $scope.action.send_message = function () {
@@ -306,18 +314,12 @@
             // **動作: 更新Highchart資料物件的內容
             update_chart_data = function (chart_data_type, chart_data) {
                 // 取得原生的highchart的物件instance
-                var highchart = $scope.chartConfig.getHighcharts();
-                highchart.series[0];
-                setInterval(function () {
-                    var x = (new Date()).getTime(), // current time
-                        y = Math.random();
-                    series.addPoint([x, y], true, true);
-                }, 1000);
 
             };
             $interval(function () {
-                  var series = $scope.chartConfig.getHighcharts().series[0];
-                  var x = (new Date()).getTime(), // current time
+                // 取得原生的highchart的物件instance
+                var series = $scope.chartConfig.getHighcharts().series[0];
+                var x = (new Date()).getTime(), // current time
                       y = Math.random();
                   series.addPoint([x, y], true, true);
             }, 1000);
