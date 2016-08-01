@@ -16,6 +16,12 @@
     <script src="assets/js/mqttws31.min.js"></script>               <!-- 連結MQTT Broker的函式庫 -->
     <script src="assets/js/Math.uuid.js"></script>                  <!-- 一個產生Unique ID的函式庫 -->
     <script src="assets/js/moment-with-locales.min.js"></script>    <!-- 一個處理時間的函式庫 -->
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>  <!-- JQuery lib -->
+	<script src="https://code.highcharts.com/modules/exporting.js"></script> <!-- Highchart: Dynamic chart -->
+
+	
+
 </head>
 <body ng-controller="rtwAppCtrl">
     <h3> Angular: ChatRoom online display with highchart</h3>
@@ -53,10 +59,9 @@
     <span ng-repeat="online_user in vm.online_users" class="text-danger"><a href="" ng-click="action.build_private_chart_topic(online_user)"><i class="fa fa-bar-chart-o"></i> {{online_user}}</a> </span>
 
     <h4>即時圖表</h4>
-    <div style="width: 400px; height: 400px; margin: 0 auto">
+	<div style="width: 400px; height: 400px; margin: 0 auto">
         <highchart id="container" config="chartConfig"></highchart>
-    </div>    
-
+    </div>
 
     <h4>己訂閱的主題</h4>
     <table class="table-bordered">
@@ -106,7 +111,7 @@
         var rtwApp = angular.module('rtwApp', ["highcharts-ng"]);
 
         // 定義Angular Controller
-        rtwApp.controller('rtwAppCtrl', function ($scope) {
+        rtwApp.controller('rtwAppCtrl', function ($scope, $interval) {
             // 全域變數
             var mqtt_client;
             // 初始view model的資料與變數
@@ -310,150 +315,82 @@
                 }, 1000);
 
             };
+            $interval(function () {
+                  var series = $scope.chartConfig.getHighcharts().series[0];
+                  var x = (new Date()).getTime(), // current time
+                      y = Math.random();
+                  series.addPoint([x, y], true, true);
+            }, 1000);
 
             // 設定要繋結到Highchart的chartConfig物件
-            // $scope.chartConfig = {
-            //     chart: {
-            //     type: 'spline',
-            //     animation: Highcharts.svg, // don't animate in old IE
-            //     marginRight: 10,
-            //     events: {
-            //         load: function () {
+			$scope.chartConfig = {
+				chart: {
+					type: 'spline',
+					animation: Highcharts.svg, // don't animate in old IE
+					marginRight: 10,
+					events: {
+						load: function () {
 
-            //             // set up the updating of the chart each second
-            //             var series = this.series[0];
-            //             setInterval(function () {
-            //                 var x = (new Date()).getTime(), // current time
-            //                     y = Math.random();
-            //                 series.addPoint([x, y], true, true);
-            //             }, 1000);
-            //         }
-            //     }
-            // },
-            // title: {
-            //     text: 'Live random data'
-            // },
-            // xAxis: {
-            //     type: 'datetime',
-            //     tickPixelInterval: 150
-            // },
-            // yAxis: {
-            //     title: {
-            //         text: 'Value'
-            //     },
-            //     plotLines: [{
-            //         value: 0,
-            //         width: 1,
-            //         color: '#808080'
-            //     }]
-            // },
-            // tooltip: {
-            //     formatter: function () {
-            //         return '<b>' + this.series.name + '</b><br/>' +
-            //             Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
-            //             Highcharts.numberFormat(this.y, 2);
-            //     }
-            // },
-            // legend: {
-            //     enabled: false
-            // },
-            // exporting: {
-            //     enabled: false
-            // },
-            // series: [{
-            //     name: 'Random data',
-            //     data: (function () {
-            //         // generate an array of random data
-            //         var data = [],
-            //             time = (new Date()).getTime(),
-            //             i;
+							// set up the updating of the chart each second
+							var series = this.series[0];
+							setInterval(function () {
+								var x = (new Date()).getTime(), // current time
+									y = Math.random();
+								series.addPoint([x, y], true, true);
+							}, 1000);
+						}
+					}
+				},
+				title: {
+					text: 'Live random data'
+				},
+				xAxis: {
+					type: 'datetime',
+					tickPixelInterval: 150
+				},
+				yAxis: {
+					title: {
+						text: 'Value'
+					},
+					plotLines: [{
+						value: 0,
+						width: 1,
+						color: '#808080'
+					}]
+				},
+				tooltip: {
+					formatter: function () {
+						return '<b>' + this.series.name + '</b><br/>' +
+							Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+							Highcharts.numberFormat(this.y, 2);
+					}
+				},
+				legend: {
+					enabled: false
+				},
+				exporting: {
+					enabled: false
+				},
+				series: [{
+					name: 'Random data',
+					data: (function () {
+						// generate an array of random data
+						var data = [],
+							time = (new Date()).getTime(),
+							i;
 
-            //         for (i = -19; i <= 0; i += 1) {
-            //             data.push({
-            //                 x: time + i * 1000,
-            //                 y: Math.random()
-            //             });
-            //         }
-            //         return data;
-            //     }())
-            // }]
-            // };            
-        });
+						for (i = -19; i <= 0; i += 1) {
+							data.push({
+								x: time + i * 1000,
+								y: Math.random()
+							});
+						}
+						return data;
+					}())
+				}]
+			};
+		});
+	</script>
 
-    $(document).ready(function () {
-        Highcharts.setOptions({
-            global: {
-                useUTC: false
-            }
-        });
-
-        $('#container').highcharts({
-            chart: {
-                type: 'spline',
-                animation: Highcharts.svg, // don't animate in old IE
-                marginRight: 10,
-                events: {
-                    load: function () {
-
-                        // set up the updating of the chart each second
-                        var series = this.series[0];
-                        setInterval(function () {
-                            var x = (new Date()).getTime(), // current time
-                                y = Math.random();
-                            series.addPoint([x, y], true, true);
-                        }, 1000);
-                    }
-                }
-            },
-            title: {
-                text: 'Live random data'
-            },
-            xAxis: {
-                type: 'datetime',
-                tickPixelInterval: 150
-            },
-            yAxis: {
-                title: {
-                    text: 'Value'
-                },
-                plotLines: [{
-                    value: 0,
-                    width: 1,
-                    color: '#808080'
-                }]
-            },
-            tooltip: {
-                formatter: function () {
-                    return '<b>' + this.series.name + '</b><br/>' +
-                        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
-                        Highcharts.numberFormat(this.y, 2);
-                }
-            },
-            legend: {
-                enabled: false
-            },
-            exporting: {
-                enabled: false
-            },
-            series: [{
-                name: 'Random data',
-                data: (function () {
-                    // generate an array of random data
-                    var data = [],
-                        time = (new Date()).getTime(),
-                        i;
-
-                    for (i = -19; i <= 0; i += 1) {
-                        data.push({
-                            x: time + i * 1000,
-                            y: Math.random()
-                        });
-                    }
-                    return data;
-                }())
-            }]
-        });
-    });
-    </script>
 </body>
 </html>
