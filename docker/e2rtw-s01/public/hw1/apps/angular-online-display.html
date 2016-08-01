@@ -20,7 +20,15 @@
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>  <!-- JQuery lib -->
 	<script src="https://code.highcharts.com/modules/exporting.js"></script> <!-- Highchart: Dynamic chart -->
 
-	
+<style type="text/css">
+.red {
+    color: red; 
+}
+
+.black {
+    color: black;
+}
+</style>
 
 </head>
 <body ng-controller="rtwAppCtrl">
@@ -63,17 +71,20 @@
         <highchart id="container" config="chartConfig"></highchart>
     </div>
 
-    <h4>己訂閱的主題</h4>
+    <h4>即時聊天</h4>
     <table class="table-bordered">
         <tr>
             <th> User </th>
-            <th> Message </th>
+            <th style="width: 400px;"> Message </th>
+            <th> Time </th>
         </tr>
-        <tr ng-repeat="subscribed_topic in vm.subscribed_topics">
-            <td>{{subscribed_topic}}</td>
-            <td><input type="button" value="Unsubscribe" ng-click="action.unsubscribe_topic(subscribed_topic)" /></td>
+        <tr ng-repeat="public_chat_message in vm.public_chat_messages">
+            <td ng-class='{red : public_chat_message.self, black: !public_chat_message.self}'>{{public_chat_message.user}}:</td>
+            <td ng-class='{red : public_chat_message.self, black: !public_chat_message.self}'>{{public_chat_message.msg}}</td>
+            <td ng-class='{red : public_chat_message.self, black: !public_chat_message.self}'>{{public_chat_message.eventdt}}</td>
         </tr>
     </table>
+
     
     <h4>己訂閱的主題</h4>
     <table class="table-bordered">
@@ -97,11 +108,11 @@
             <th> Timestamp </th>
         </tr>
         <tr ng-repeat="inbound_message in vm.inbound_messages">
-            <td>{{inbound_message.topic}} </td>
-            <td>{{inbound_message.retained}} </td>
+            <td>{{inbound_message.topic}}</td>
+            <td>{{inbound_message.retained}}</td>
             <td>{{inbound_message.qos}}</td>
-            <td>{{inbound_message.payload}} </td>
-            <td>{{inbound_message.eventdt}} </td>
+            <td>{{inbound_message.payload}}</td>
+            <td>{{inbound_message.eventdt}}</td>
         </tr>
     </table>
 
@@ -131,6 +142,9 @@
             $scope.vm.inbound_messages = [];
             $scope.vm.online_users = [];
 
+            // HW2: add for tracking public chat channel
+            $scope.vm.public_chat_messages = [];
+
             // HW2: add visitors to record visitor on-line
             $scope.vm.visitors = 0;
 
@@ -150,7 +164,7 @@
                     return;
                 }
                 // 更新圖表的抬頭
-                $scope.chartConfig.title.text = "來訪人數: " + $scope.vm.visitors;
+                $scope.chartConfig.title.text = "Connecting: " + $scope.vm.user_id;
 
                 // 產生mqtt連結client物件的instance
                 mqtt_client = new Paho.MQTT.Client($scope.vm.mqtt_host, Number($scope.vm.mqtt_port), Math.uuid(8, 16));
@@ -193,6 +207,11 @@
                     mqtt_client.subscribe(private_chat_topic);
                     $scope.vm.subscribed_topics.push(private_chat_topic);
 
+                    // HW2: 訂閱自己的 public channel主題 "rtwchat/{user_id}/public"
+                    var public_chat_topic = "rtwchat/user/+/public";
+                    mqtt_client.subscribe(public_chat_topic);
+                    $scope.vm.subscribed_topics.push(public_chat_topic);
+
                     $scope.$apply(); //<--這個動作通知angular.js來觸發data-binding的sync
                 }
                 // 當與mqtt broker的連結被斷開時會被呼叫的function
@@ -231,14 +250,18 @@
                         if (msgObj.payload == "online") {
                             if (idx == -1) {
                                 $scope.vm.online_users.push(user_id);
-                                $scope.vm.visitors = $scope.vm.visitors + 1;
+                                $scope.vm.visitors ++;
                             }
                         }
                         else {
-                            if (idx != -1)
+                            if (idx != -1) {
                                 $scope.vm.online_users.splice(idx, 1);
+                                scope.vm.visitors ++;
+                            }
                         }
                     }
+                    $scope.chartConfig.title.text = "線上人數: " + $scope.vm.visitors;
+                    console.log("visitors= " + $scope.vm.visitors);
 
                     // 使用regular expression來偵測是否為"chart"訊息
                     regex = "rtwchat/user/(.+)/chart/(.+)";
@@ -249,6 +272,22 @@
                         var chartData = Number(msgObj.payload);
                         update_chart_data(chartData_Type, chartData);
                     }
+
+                    // HW2: 使用regular expression來偵測是否為 public channel
+                    // Format: "rtwchat/user/(.+)/public";
+                    regex = "rtwchat/user/(.+)/public";
+                    found = topic.match(regex);
+                    if (found) { // this is "Chart data" message
+                        var user_id = found[1]; //get the "userid" from regular expression matching 
+                        var userMessageObj = {
+                            'user': user_id,
+                            'msg': message.payloadString,
+                            'self': (user_id == $scope.vm.user_id),
+                            'eventdt': moment().format('YYYY-MM-DD, hh:mm:ss')
+                        };
+                        $scope.vm.public_chat_messages.push(userMessageObj);
+                    }
+
 
                     $scope.$apply(); //<--這個動作通知angular.js來觸發data-binding的sync
                 }
@@ -277,14 +316,12 @@
             };
             // **動作: 送出訊息
             $scope.action.send_message = function () {
-                var mqtt_message = new Paho.MQTT.Message($scope.vm.message+""); //轉換數字成文字
-                // rtwchat/user/{user_id:TO}/chart/{chart_data_type}
-                mqtt_message.destinationName = $scope.vm.topic + "/" + $scope.vm.chart_data_type;
-                mqtt_message.retained = true; // 設成retained
+                // 送出使用者上線的訊息到"rtwchat/{user_id}/public"
+                var mqtt_message = new Paho.MQTT.Message($scope.vm.message);
+                mqtt_message.destinationName = "rtwchat/user/" + $scope.vm.user_id + "/public";
+                mqtt_message.retained = true; // *** 設成保留訊息 ***
                 mqtt_client.send(mqtt_message);
 
-                // AT test
-                update_chart_data(0,0);
             };
             // **動作: 訂閱訊息主題
             $scope.action.subscribe_topic = function () {
@@ -320,7 +357,8 @@
                 // 取得原生的highchart的物件instance
                 var series = $scope.chartConfig.getHighcharts().series[0];
                 var x = (new Date()).getTime(), // current time
-                      y = Math.random();
+                      // y = Math.random();
+                      y = $scope.vm.visitors;
                   series.addPoint([x, y], true, true);
             }, 1000);
 
