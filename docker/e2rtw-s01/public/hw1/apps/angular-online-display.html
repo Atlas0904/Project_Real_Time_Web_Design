@@ -239,7 +239,7 @@
                     };
 
                     // 使用html的table來秀出訊息
-                    $scope.vm.inbound_messages.unshift(msgObj); //最新進來的訊息透在最上面   
+                    $scope.vm.inbound_messages.unshift(msgObj); //最新進來的訊息透在最上面
 
                     // 使用regular expression來偵測是否為"presence"訊息
                     var regex = "rtwchat/user/(.+)/presence";
@@ -247,21 +247,24 @@
                     if (found) { // this is "Presence" message
                         var user_id = found[1]; //get the "userid" from regular expression matching 
                         var idx = $scope.vm.online_users.indexOf(user_id); // 檢查在UI的array中是否存在相同的使用者
+                        console.log("user_id: " + user_id + " idx: " + idx);
                         if (msgObj.payload == "online") {
                             if (idx == -1) {
                                 $scope.vm.online_users.push(user_id);
                                 $scope.vm.visitors++;
                             }
-                        }
-                        else {
+                        } else {
+                            console.log("msgObj.payload: " + msgObj.payload);
                             if (idx != -1) {
+                                console.log("idx: " + idx);
                                 $scope.vm.online_users.splice(idx, 1);
-                                scope.vm.visitors--;
+                                $scope.vm.visitors--;
                             }
                         }
+                        $scope.chartConfig.title.text = "線上人數: " + $scope.vm.visitors;
+                        console.log("visitors= " + $scope.vm.visitors);
                     }
-                    $scope.chartConfig.title.text = "線上人數: " + $scope.vm.visitors;
-                    console.log("visitors= " + $scope.vm.visitors);
+
 
                     // 使用regular expression來偵測是否為"chart"訊息
                     regex = "rtwchat/user/(.+)/chart/(.+)";
