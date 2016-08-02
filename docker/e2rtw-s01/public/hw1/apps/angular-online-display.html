@@ -250,13 +250,13 @@
                         if (msgObj.payload == "online") {
                             if (idx == -1) {
                                 $scope.vm.online_users.push(user_id);
-                                $scope.vm.visitors ++;
+                                $scope.vm.visitors++;
                             }
                         }
                         else {
                             if (idx != -1) {
                                 $scope.vm.online_users.splice(idx, 1);
-                                scope.vm.visitors ++;
+                                scope.vm.visitors--;
                             }
                         }
                     }
